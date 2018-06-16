@@ -5,6 +5,26 @@ from copy import deepcopy
 
 #%%
 class UmbrellaRunner():
+    """
+    Runner class for adaptive umbrella sampling
+    
+    Attributes:
+        cvs (numpy array): A multidimensional array of all collective variables (cvs) in the form [cv_min, cv_max, cv_delta]
+         Example: to sample a 2 dimensional grid where cv1 and cv2 go from 0 to 3 with stepsize 0.5, use 
+         np.array([[0,3,1],[0,3,1]])
+        cvs_init (tuple): Starting coordinates for umbrella sampling. Must be a tuple with the same dimension as cvs
+        E_min (float, default=0): Starting energy for exporative umbrella sampling
+        E_max (float, default=inf): Final energy. Umbrella sampling is stopped if no frames with E < E_max are found
+        E_incr (float, default=1): E_min is incremented by this until E_max is reached
+        max_iterations (int, default=-1): Max. number of iterations before umbrella sampling stops. -1 for infinite sampling
+    
+    """
+
+    def __init__(self):
+        self.max_iterations = -1
+        self.E_min = 0
+        self.E_max = np.inf
+        self.E_incr = 1
 
     def _get_pmf_shape(self):
         """ returns the shape of the pmf according to the cvs """
@@ -131,7 +151,7 @@ class UmbrellaRunner():
     
     def _main(self):
         # get the initial simulation and surrounding frames
-        root_frames = [self._get_index_for_lambdas(self.lambda_init)]
+        root_frames = [self._get_index_for_lambdas(self.cvs_init)]
         new_frames = self._get_new_frames(self.pmf, root_frames)
         
         self.num_iterations = 0
@@ -146,15 +166,15 @@ class UmbrellaRunner():
                 return
             
             self.E = self.E_min
-            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            print("Iteration: {} (max={})".format(self.num_iterations, self.max_iterations))
-            new_lambdas = [self._get_lambdas_for_index(x) for x in new_frames.keys()]
-            
+            print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
+            lambdas = dict([(self._get_lambdas_for_index(x), self._get_lambdas_for_index(y)) for x,y in new_frames.items()])
+
+            self.pre_run_hook()
             print("Running simulations")
-            self.simulate_frames(new_frames, new_lambdas)
+            self.simulate_frames(lambdas, new_frames)
             
             print("Calculating new PMF")
-            self.pmf = self.wham()
+            self.pmf = self.calculate_new_pmf()
             self.after_run_hook()
             
             while self.E <= self.E_max:
@@ -169,20 +189,124 @@ class UmbrellaRunner():
             
 
     def run(self):
+        # initialize the pmf
         self.pmf = self._init_pmf()
-        self._main()
-        print("Umbrella sampling finished.")
-        
-    def simulate_frames(self, new_frames, new_lambdas):
-        print("TODO Implement me")
 
-    def wham(self):
-        print("TODO Implement me")
-    
-    def after_run_hook(self):
+        # start the simulation/evaluation loop
+        self._main()
+        print("Finished.")
+        
+    def simulate_frames(self, frames, lambdas):
+        """ This should be implemented to run the simulation for each frame in ```frames```
+         with ```lambdas```. Both variables are dictionaries where new values are keys and root values are values
+         """
+        print("New lambda values to simulate: {}".format(lambdas))
+        print("(You should implement `simulate_frames` method yourself.)")
+
+    def calculate_new_pmf(self):
+        """ This should be overwritten to calculate the PMF based on the new simulations and
+        return a pmf of correct shape/spacing according to the cvs"""
         pass
 
 
+    def after_run_hook(self):
+        """ This can be implemented to hook into the simulation cycle after the reevaluation of the pmf """
+        pass
+
+    def pre_run_hook(self):
+        """ This can be implemented to hook into the simulation cycle before the simulation runs """
+        pass
+
+class WHAM2DRunner(UmbrellaRunner):
+    """ Umbrella runner implementation that uses wham-2d to perform 
+    the pmf calculation.
+    
+    Attributes:
+        WHAM_EXEC: path to wham executeable
+        
+        """
+
+    def __init__(self):
+        UmbrellaRunner.__init__(self)
+        self.WHAM_EXEC = 'wham-2d'
+
+    def calculate_new_pmf(self):
+        import os
+        from shutil import copyfile
+
+        simulation_dir = "simulations"
+        print("Collecting sampling data from simulations folder")
+
+        # collect COLVARs
+        wham_dir = "WHAM/"
+        if not os.path.exists(wham_dir):
+            os.makedirs(wham_dir)
+
+        for folder in os.listdir(simulation_dir):
+            src = os.path.join(simulation_dir, folder, "COLVAR")
+            dst = os.path.join(wham_dir, folder + ".xvg")
+            copyfile(src, dst)
+
+        # create metadata file
+        metadata_file = os.path.join(wham_dir, "{}_metadata.dat".format(self.num_iterations))
+        fc_x = 100
+        fc_y = 100
+        with open(metadata_file, 'w') as out:
+            for f in os.listdir(simulation_dir):
+                prefix, x, y = f.split("_")
+                out.write("WHAM/{}.xvg {} {} {} {}\n".format(f, x, y, fc_x, fc_y))
+
+        # run WHAM2d
+        print("Running WHAM-2d")
+        wham_output = os.path.join(wham_dir, "{}_freeenergy.dat".format(self.num_iterations))
+        periodicity_x = "pi"
+        periodicity_y = "pi"
+        tolerance = 0.1
+        frames_x, frames_y = 1002, 1002
+        min_x = self.cvs[0][0]
+        max_x = self.cvs[0][1]
+        min_y = self.cvs[1][0]
+        max_y = self.cvs[1][1]
+
+        cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} 298 0 {metafile} {outfile} 0".format(
+            exec=self.WHAM_EXEC,
+            px=periodicity_x,
+            min_x=min_x,
+            max_x=max_x,
+            frames_x=frames_x,
+            py=periodicity_y,
+            min_y=min_y,
+            max_y=max_y,
+            frames_y=frames_y,
+            tol=tolerance,
+            metafile=metadata_file,
+            outfile=wham_output
+        )
+        print(cmd)
+        os.system(cmd)
+
+        # read wham to new pmf
+        return self.read_pmf(wham_output)
+
+    def read_pmf(self, pmf_path):
+        import pandas as pd
+        print("Update PMF from WHAM")
+        df = pd.read_csv(pmf_path, delim_whitespace=True, names=['x', 'y', 'e', 'pro'], skiprows=1,
+                         index_col=None)
+        df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=['e'], how='all')
+        new_pmf = deepcopy(self.pmf)
+        for x in range(new_pmf.shape[0]):
+            for y in range(new_pmf.shape[1]):
+                lambdax, lambday = self._get_lambdas_for_index((x, y))
+                x_selection = (df.x - lambdax).abs() < 0.01
+                y_selection = (df.y - lambday).abs() < 0.01
+                selected_energies = df[(x_selection) & (y_selection)].e
+                if len(selected_energies) == 0:
+                    new_pmf[x, y] = -1
+                else:
+                    new_pmf[x, y] = selected_energies.iloc[0]
+
+        return new_pmf
 
 
 
