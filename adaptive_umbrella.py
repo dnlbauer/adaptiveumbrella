@@ -1,79 +1,124 @@
 #!/usr/bin/env python3
 import numpy as np
+import unittest
 from copy import deepcopy
-from abc import ABC, abstractmethod
-
 
 #%%
-class UmbrellaRunner(ABC):
-    def init_pmf(self):
-        """ returns a NxM matrix filled with -1 where N and M are the total number
-        of lambda frames along the reaction coordinates as determined by
-        self.lambda_min, self.lambda_max and self.lambda_delta """
-        ranges = []
-        for dimen in range(len(self.lambda_delta)):
-            ranges.append(np.arange(self.lambda_min[dimen], self.lambda_max[dimen]+self.lambda_delta[dimen], self.lambda_delta[dimen]))
+class UmbrellaRunner():
 
-        mesh = np.meshgrid(*ranges)
-        pmf = np.zeros(np.dstack(mesh).shape[:-1]) # this is magic
-        pmf[:] = -1
+    def _get_pmf_shape(self):
+        """ returns the shape of the pmf according to the cvs """
+        shape = []
+        for dimen in self.cvs:
+            windows = np.arange(*dimen)
+            size = len(windows)
+            if windows[-1] % dimen[-1] == 0:
+                size += 1
+            shape.append(size)
+        return shape
+
+
+    def _init_pmf(self):
+        """ returns an empty matrix where each dimension equals the number of frames along the corresponding reaction
+        coordinate """
+        shape = self._get_pmf_shape()
+        pmf = np.empty(shape)
+        pmf.fill(-1)
         return pmf
-        
-    def get_lambdas_for_index(self, idx):
-        """ takes a coordinate tuple and returns corresponding lambda values """
-        lambdas = self.lambda_min + idx*self.lambda_delta
-        return np.round(lambdas, 10)
 
-    def get_index_for_lambdas(self, lambdas):
-        """ takes a lambda tuple and returns corresponding indeces of the pmf instance variable"""
+        
+    def _get_lambdas_for_index(self, idx):
+        """ takes a coordinate tuple of the pmf and returns corresponding lambda values """
+
+        lambdas = self.cvs.T[0] + idx * self.cvs.T[2]
+        return tuple(np.round(lambdas, 10))
+
+    def _get_index_for_lambdas(self, lambdas):
+        """ takes a lambda tuple and returns corresponding indexes of the pmf 
+        TODO: faster implementation required
+        """
         idx = []
         for dimen in range(len(lambdas)):
-            r = np.arange(self.lambda_min[dimen], self.lambda_max[dimen]+self.lambda_delta[dimen], self.lambda_delta[dimen])
+            cv = self.cvs[dimen]
+            r = np.arange(cv[0], cv[1]+cv[2], cv[2])
         
             for i in range(len(r)):
                 if abs(r[i]-lambdas[dimen]) < 0.00001:
                     idx.append(i)
                     break
-        return idx
+        if len(idx) == len(lambdas):
+            return tuple(idx)
+        else: # if len differs, theres no index for every dimension
+            raise ValueError("{} has no index.".format(lambdas))
 
-    # TODO make this work with more then 2 dimensions
-    def get_root_frames(self, pmf, E_max):
+    def _get_root_frames(self, pmf, E_max):
         """ returns the index of all positions in the pmf where the energy is
-        smaller W_max and greater 0 """
+        smaller E_max"""
         selection = np.where((pmf <= E_max) & (pmf >= 0))
-        frames = []
-        for i in range(len(selection[0])):
-            frames.append((selection[0][i], selection[1][i]))
-        return frames
+        zipped = list(zip(*selection))
+        return zipped
 
-    # TODO make this work with more then 2 dimensions
-    def get_new_frames(self, pmf, root_frames):
+    def _get_new_frames(self, pmf, root_frames):
         """ returns a dict of all frames surrounding the root_frames
         that have not an assigned energy yet, as well as their corresponding root
         frame in the format {new_frame1: root_frame1, new_frame2: root_frame2} """
-        
-        # find all neighboring frames and create a dict that associates them to their
-        # root frames
+
+        def generate_neighbor_list(root, coords=[]):
+            """ recursively builds a list of all direct neighbors of the root coordinate """
+            if len(coords) > 0 and len(coords[0]) == len(root):
+                return [tuple(x) for x in coords]
+            elif len(coords) == 0:
+                coords.append([root[0]-1])
+                coords.append([root[0]])
+                coords.append([root[0]+1])
+                return generate_neighbor_list(root, coords)
+            else:
+                new_coords = []
+                for coord in coords:
+                    dimen = len(coord)
+
+                    new_coord = deepcopy(coord)
+                    new_coord.append(root[dimen]-1)
+                    new_coords.append(new_coord)
+
+                    new_coord = deepcopy(coord)
+                    new_coord.append(root[dimen])
+                    new_coords.append(new_coord)
+
+                    new_coord = deepcopy(coord)
+                    new_coord.append(root[dimen]+1)
+                    new_coords.append(new_coord)
+                return generate_neighbor_list(root, new_coords)
+
+        def in_pmf(frame):
+            num_dimens = len(self.pmf.shape)
+            for dimen in range(num_dimens):
+                if frame[dimen] < 0 or frame[dimen] >= self.pmf.shape[dimen]:
+                    return False
+            return True
+
+
+        # find all neighboring frames and create a dict that associates them to the root frame with lowest energy
         new_frames = {}
         for frame in root_frames:
-            for x in [-1, 0, 1]:
-                for y in [-1, 0, 1]:
-                    new_frame = list(frame)
-                    new_frame[0] += x
-                    new_frame[1] += y
-                    if new_frame[0] < 0 or new_frame[0]+1 > len(self.pmf[0]) or new_frame[1] < 0 or new_frame[1]+1 > len(self.pmf[1]):
-                        continue
-                    try:
-                        old_root = new_frames[tuple(new_frame)]
-                        if old_root is not None:    
-                            old_start_energy = pmf[old_root[0], old_root[1]]
-                            new_start_energy = pmf[frame[0], frame[1]]
-                            if old_start_energy > new_start_energy:
-                                new_frames[tuple(new_frame)] = frame
-                    except KeyError:
-                        new_frames[tuple(new_frame)] = frame
-    
-        # remove already sampled frames (energy >= 0)
+            neighbors = generate_neighbor_list(frame)
+
+            # remove neighbors that are not inside the pmf
+            neighbors = [n for n in neighbors if in_pmf(n)]
+
+            # for each neighbor, check if its already in the list and compare root frame energy
+            for n in neighbors:
+                try:
+                    root_energy = pmf[frame]
+                    old_root = new_frames[n]
+                    old_root_energy = pmf[old_root]
+                    if root_energy < old_root_energy:
+                        new_frames[n] = frame
+                except KeyError:
+                    new_frames[n] = frame
+
+
+        # remove already sampled frames (where energy >= 0)
         new_frames_list = list(new_frames.keys())
         for idx in range(len(new_frames_list)):
             new_frame = new_frames_list[idx]
@@ -84,10 +129,10 @@ class UmbrellaRunner(ABC):
         return new_frames
     
     
-    def main(self):
+    def _main(self):
         # get the initial simulation and surrounding frames
-        root_frames = [self.get_index_for_lambdas(self.lambda_init)]
-        new_frames = self.get_new_frames(self.pmf, root_frames)
+        root_frames = [self._get_index_for_lambdas(self.lambda_init)]
+        new_frames = self._get_new_frames(self.pmf, root_frames)
         
         self.num_iterations = 0
         
@@ -103,7 +148,7 @@ class UmbrellaRunner(ABC):
             self.E = self.E_min
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             print("Iteration: {} (max={})".format(self.num_iterations, self.max_iterations))
-            new_lambdas = [ self.get_lambdas_for_index(x) for x in new_frames.keys() ]
+            new_lambdas = [self._get_lambdas_for_index(x) for x in new_frames.keys()]
             
             print("Running simulations")
             self.simulate_frames(new_frames, new_lambdas)
@@ -113,8 +158,8 @@ class UmbrellaRunner(ABC):
             self.after_run_hook()
             
             while self.E <= self.E_max:
-                root_frames = self.get_root_frames(self.pmf, self.E)
-                new_frames = self.get_new_frames(self.pmf, root_frames)
+                root_frames = self._get_root_frames(self.pmf, self.E)
+                new_frames = self._get_new_frames(self.pmf, root_frames)
                 
                 if len(new_frames) == 0:
                     self.E += self.E_incr
@@ -124,134 +169,154 @@ class UmbrellaRunner(ABC):
             
 
     def run(self):
-        self.pmf = self.init_pmf()
-        self.main()
+        self.pmf = self._init_pmf()
+        self._main()
         print("Umbrella sampling finished.")
         
-    @abstractmethod
-    def simulate_frames(new_frames, new_lambdas):
-        pass
-    
-    @abstractmethod
-    def wham():
-        pass
+    def simulate_frames(self, new_frames, new_lambdas):
+        print("TODO Implement me")
+
+    def wham(self):
+        print("TODO Implement me")
     
     def after_run_hook(self):
         pass
-                
-if __name__ == "__main__":
-    from copy import deepcopy
-    import subprocess
-    import os
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    class MyUmbrellaRunner(UmbrellaRunner):
-        
-        def wham(self):
-            # copy colvar files
-            os.system("mkdir -p WHAM")
-            for f in os.listdir("sim"):
-                with open("sim/{}/COLVAR".format(f), "r") as i:
-                    with open("WHAM/{}.xvg".format(f), 'w') as o:
-                        for line in i.readlines()[100:]:
-                            o.write(line)
-
-                    
-            # generate metadata.dat
-            x_vals = []
-            y_vals = []
-            metadata_file = "WHAM/{}_metadata.dat".format(self.num_iterations)
-            with open(metadata_file, 'w') as o:
-                for f in os.listdir("sim"):
-                    prefix, x, y = f.split("_")
-                    x_vals.append(float(x))
-                    y_vals.append(float(y))
-                    o.write("WHAM/{}.xvg {} {} {} {}\n".format(f, x,y, 100, 100))
-            x_vals = np.array(list(set(x_vals)))
-            y_vals = np.array(list(set(y_vals)))
-
-            # min_x = x_vals.min() - self.lambda_delta[0]
-            # min_y = y_vals.min() - self.lambda_delta[1]
-            # max_x = x_vals.max() + self.lambda_delta[0]
-            # max_y = y_vals.max() + self.lambda_delta[1]
-            min_x, min_y = self.lambda_min
-            max_x, max_y = self.lambda_max
-            frames_x, frames_y = 1002, 1002
-            print("Running WHAM-2d:")
-            wham_output = "WHAM/{}_freeenergy.dat".format(self.num_iterations)
-            cmd = "/opt/wham/wham-2d/wham-2d Px=pi {min_x} {max_x} {frames_x} Py=pi {min_y} {max_y} {frames_y} 0.1 298 0 {metafile} {outfile} 0".format(
-                      	min_x=min_x,
-                      	max_x=max_x,
-                      	frames_x=frames_x,
-                      	min_y=min_y,
-                      	max_y=max_y,
-                      	frames_y=frames_y,
-                      	metafile=metadata_file,
-                      	outfile=wham_output
-                      	)
-            print(cmd)
-            os.system(cmd)
-        
-            print("Update pmf from wham")
-            df = pd.read_csv(wham_output, delim_whitespace=True, names=['x','y','e', 'pro'], skiprows=1, index_col=None)
-            df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=['e'], how='all')
-            new_pmf = deepcopy(self.pmf)
-            for x in range(new_pmf.shape[0]):
-                for y in range(new_pmf.shape[1]):
-                    lambdax, lambday = self.get_lambdas_for_index((x,y))
-                    x_selection = (df.x-lambdax).abs() < 0.01
-                    y_selection = (df.y-lambday).abs() < 0.01
-                    selected_energies = df[(x_selection) & (y_selection)].e
-                    if len(selected_energies) == 0:
-                        new_pmf[x,y] = -1
-                    else:
-                        new_pmf[x,y] = selected_energies.iloc[0] 
-                        
-                    
-            return new_pmf
-            
-        def simulate_frames(self, new_frames, new_lambdas):
-            print("{} new simulations:".format(len(new_lambdas)))
-            counter = 0
-
-            threads = []
-            for f in new_lambdas:
-                counter += 1
-                if os.path.exists("sim/sim_{}_{}/COLVAR".format(*f)):
-                    print("{}) Skipping lambdas={}/{}: COLVAR exists".format(counter, *f))
-                    continue
-                
-                print("{}) Simulate lambda1={}, lambda2={}".format(counter, *f))
-                command = "bash sim.sh {} {} 2>&1 > run.log".format(*f)
-                # print("Running {}".format(command))
-                os.system(command)
-
-        def after_run_hook(self):
-            filename = "pmf_{}.pdf".format(self.num_iterations)
-            print("Writing new pmf to {}".format(filename))
-            pmf_to_plot = deepcopy(self.pmf.T)
-            pmf_to_plot[pmf_to_plot < 0] = None
-            plt.figure()
-            plt.imshow(pmf_to_plot, origin="lower", cmap='jet')
-            cb = plt.colorbar(pad=0.1)
-            cb.set_label("kJ/mol")
-            plt.savefig(filename)
-            os.system("cp {} {}".format(filename, "pmf_current.pdf"))
-                
-                
-    
-    runner = MyUmbrellaRunner()
-    runner.lambda_max = np.array((3.1, 3.1))
-    runner.lambda_min = -runner.lambda_max
-    runner.lambda_delta = np.array((0.1, 0.1))
-    runner.lambda_init = np.array((1,-1.4))
-    runner.E_min = 5
-    runner.E_max = 100
-    runner.E_incr = 10
-    runner.max_iterations = 10
-    
-    runner.run()
 
 
+
+
+
+class UmbrellaRunnerTest(unittest.TestCase):
+
+    def test_init_pmf_3d(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (-3, 3, 1),
+            (-3, 2, 1)
+        ])
+        pmf = runner._init_pmf()
+
+        expected_shape = (7, 7, 6)
+        self.assertEquals(pmf.shape, expected_shape)
+
+    def test_init_pmf_odd(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (-3.5, 3, 1)
+        ])
+        pmf = runner._init_pmf()
+        expected_shape = (7, 7)
+        self.assertEquals(pmf.shape, expected_shape)
+
+    def test_get_lambdas_for_index(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (0, 4, 1)
+        ])
+
+        lambdas = runner._get_lambdas_for_index((0, 0))
+        self.assertAlmostEqual(lambdas, (-3, 0))
+
+        lambdas = runner._get_lambdas_for_index((3, 2))
+        self.assertEquals(lambdas, (0, 2))
+
+    def test_get_index_for_lambdas(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (0, 4, 1)
+        ])
+
+        index = runner._get_index_for_lambdas((3, 3))
+        self.assertEquals(index, (6, 3))
+
+    def test_get_index_for_lambdas_error(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (0, 4, 1)
+        ])
+
+        with self.assertRaises(ValueError) as error:
+            runner._get_index_for_lambdas((3, 2.5))
+
+    def test_get_root_frames(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (0, 4, 1)
+        ])
+        runner.pmf = runner._init_pmf()
+        runner.pmf[0, 3] = 5
+        runner.pmf[0, 2] = 2
+        root_frames = runner._get_root_frames(runner.pmf, 3)
+        self.assertEquals(1, len(root_frames))
+        self.assertEquals((0, 2), root_frames[0])
+
+    def test_get_root_frames_3d(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (0, 4, 1),
+            (0, 4, 1)
+        ])
+        runner.pmf = runner._init_pmf()
+        runner.pmf[0, 3, 3] = 5
+        runner.pmf[0, 2, 2] = 2
+        root_frames = runner._get_root_frames(runner.pmf, 3)
+        self.assertEquals(1, len(root_frames))
+        self.assertEquals((0, 2, 2), root_frames[0])
+
+    def test_get_new_frames(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-3, 3, 1),
+            (0, 4, 1)
+        ])
+        runner.pmf = runner._init_pmf()
+        runner.pmf[0, 3] = 5
+        runner.pmf[0, 2] = 2
+        runner.pmf[0, 4] = 2
+        root_frames = [(0, 3), (0, 2), (0, 4)]
+        new_frames = runner._get_new_frames(runner.pmf, root_frames)
+
+        expected_new_frames = {
+            (0, 1): (0, 2),
+            (1, 1): (0, 2),
+            (1, 2): (0, 2),
+            (1, 3): (0, 2),
+            (1, 4): (0, 4)
+        }
+        self.assertEquals(len(expected_new_frames.keys()), len(new_frames.keys()))
+        self.assertDictEqual(expected_new_frames, new_frames)
+
+    def test_get_new_frames_3d(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-1, 1, 1),
+            (-1, 1, 1),
+            (-1, 1, 1)
+        ])
+        runner.pmf = runner._init_pmf()
+        runner.pmf[1, 1, 1] = 5
+        root_frames = [(1, 1, 1)]
+        new_frames = runner._get_new_frames(runner.pmf, root_frames)
+
+        expected_new_frames = {}
+        for x in [0, 1, 2]:
+            for y in [0, 1, 2]:
+                for z in [0, 1, 2]:
+                    if (x, y, z) != (1, 1, 1):
+                        expected_new_frames[(x, y, z)] = (1, 1, 1)
+
+        self.assertEquals(26, len(new_frames.keys()))
+        self.assertDictEqual(expected_new_frames, new_frames)
+
+
+if __name__ == '__main__':
+    unittest.main()
 
 
