@@ -155,6 +155,7 @@ class UmbrellaRunner():
         new_frames = self._get_new_frames(self.pmf, root_frames)
         
         self.num_iterations = 0
+        self.E = self.E_min
         
         # outer main loop: increase E and calculate PMF until E > E_max
         while True:
@@ -165,7 +166,6 @@ class UmbrellaRunner():
                 print("Max iterations reached ({})".format(self.max_iterations))
                 return
             
-            self.E = self.E_min
             print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
             lambdas = dict([(self._get_lambdas_for_index(x), self._get_lambdas_for_index(y)) for x,y in new_frames.items()])
 
