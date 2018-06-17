@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/danijoo/adaptiveumbrella.svg?branch=master)](https://travis-ci.org/danijoo/adaptiveumbrella)
+
 # Python module for adaptive umbrella sampling
 
 This module can be used to perform adaptive umbrella sampling of a multi-dimensional potential of mean force. The
