@@ -36,14 +36,7 @@ within the class we need to define two methods. First we have to define how the 
 ```
 
 then, we have to implement a method that updates the pmf:
-```python
-  def simulate_frames(self, lambdas, frames):
-    """ Run simulations for all passed lambda steps. `lambdas` is a dictionary where each key
-    is a tuple of coordinates in the phase space and each value are the lambda values of the root
-    from which this frame should be created. `frames` is an identical dict, but with indeces of the pmf
-    numpy array defining the phase space """
-    pass
-    
+ 
 ```python
   def calculate_new_pmf(self):
   """ This is called after `simulate_frames` and should calculate the new PMF. return value must be a numpy
