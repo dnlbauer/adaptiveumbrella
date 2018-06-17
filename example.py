@@ -13,11 +13,20 @@ class MyUmbrellaRunner(WHAM2DRunner):
         pmf_to_plot = deepcopy(self.pmf.T)
         pmf_to_plot[pmf_to_plot < 0] = None
         plt.figure()
-        plt.imshow(pmf_to_plot, origin="lower", cmap='jet')
+        plt.imshow(pmf_to_plot, origin="bottom", cmap='jet')
+        ticks = [(x,x) for x in [-3, -2, -1, 0, 1, 2, 3]]
+        tick_positions = [ self._get_index_for_lambdas(x)[0] for x in ticks ]
+        tick_labels = [ str(x[0]) for x in ticks ]
+        
+        plt.xticks(tick_positions, tick_labels)
+        plt.yticks(tick_positions, tick_labels)
+        
+
         cb = plt.colorbar(pad=0.1)
         cb.set_label("kJ/mol")
         plt.savefig(filename)
         os.system("cp {} {}".format(filename, "pmf_current.pdf"))
+
 
     def simulate_frames(self, lambdas, frames):
         print("{} new simulations:".format(len(lambdas)))
@@ -35,17 +44,16 @@ class MyUmbrellaRunner(WHAM2DRunner):
             # print("Running {}".format(command))
             os.system(command)
 
-
 runner = MyUmbrellaRunner()
 runner.WHAM_EXEC = "/opt/wham/wham-2d/wham-2d"
 runner.cvs = np.array([
-    (-3.1, 3.1, 0.1),
-    (-3.1, 3.1, 0.1),
+    (-3, 3, 0.2),
+    (-3, 3, 0.2),
 ])
-runner.cvs_init = (1, -1.4)
+runner.cvs_init = (1.4, -1.4)
 runner.E_min = 10
-runner.E_max = 200
+runner.E_max = 100
 runner.E_incr = 10
-runner.max_iterations = 25
+runner.max_iterations = 100
 
 runner.run()

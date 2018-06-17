@@ -76,55 +76,49 @@ class UmbrellaRunner():
         smaller E_max"""
         selection = np.where((pmf <= E_max) & (pmf >= 0))
         zipped = list(zip(*selection))
+
         return zipped
+
+    def _generate_neighbor_list(self, root):
+        """ builds a list of all direct neighbors of the root coordinate """
+        dimens = len(root)
+        coords = []
+        for i in range(dimens):
+            if len(coords) == 0:
+                new_coords = []
+                new_coords.append([root[i]-1])
+                new_coords.append([root[i]])
+                new_coords.append([root[i]+1])
+                coords = new_coords
+            else:
+                new_coords = []
+                for coord in coords:
+                    new_coords.append(coord + [root[i] - 1])
+                    new_coords.append(coord + [root[i]])
+                    new_coords.append(coord + [root[i] + 1])
+                coords = new_coords
+        return [tuple(x) for x in coords]
+
+
+    def _is_in_pmf(self, frame):
+        num_dimens = len(self.pmf.shape)
+        for dimen in range(num_dimens):
+            if frame[dimen] < 0 or frame[dimen] >= self.pmf.shape[dimen]:
+                return False
+        return True
 
     def _get_new_frames(self, pmf, root_frames):
         """ returns a dict of all frames surrounding the root_frames
         that have not an assigned energy yet, as well as their corresponding root
         frame in the format {new_frame1: root_frame1, new_frame2: root_frame2} """
 
-        def generate_neighbor_list(root, coords=[]):
-            """ recursively builds a list of all direct neighbors of the root coordinate """
-            if len(coords) > 0 and len(coords[0]) == len(root):
-                return [tuple(x) for x in coords]
-            elif len(coords) == 0:
-                coords.append([root[0]-1])
-                coords.append([root[0]])
-                coords.append([root[0]+1])
-                return generate_neighbor_list(root, coords)
-            else:
-                new_coords = []
-                for coord in coords:
-                    dimen = len(coord)
-
-                    new_coord = deepcopy(coord)
-                    new_coord.append(root[dimen]-1)
-                    new_coords.append(new_coord)
-
-                    new_coord = deepcopy(coord)
-                    new_coord.append(root[dimen])
-                    new_coords.append(new_coord)
-
-                    new_coord = deepcopy(coord)
-                    new_coord.append(root[dimen]+1)
-                    new_coords.append(new_coord)
-                return generate_neighbor_list(root, new_coords)
-
-        def in_pmf(frame):
-            num_dimens = len(self.pmf.shape)
-            for dimen in range(num_dimens):
-                if frame[dimen] < 0 or frame[dimen] >= self.pmf.shape[dimen]:
-                    return False
-            return True
-
-
         # find all neighboring frames and create a dict that associates them to the root frame with lowest energy
         new_frames = {}
         for frame in root_frames:
-            neighbors = generate_neighbor_list(frame)
+            neighbors = self._generate_neighbor_list(frame)
 
             # remove neighbors that are not inside the pmf
-            neighbors = [n for n in neighbors if in_pmf(n)]
+            neighbors = [n for n in neighbors if self._is_in_pmf(n)]
 
             # for each neighbor, check if its already in the list and compare root frame energy
             for n in neighbors:
@@ -165,6 +159,11 @@ class UmbrellaRunner():
             if(self.max_iterations > 0 and self.num_iterations > self.max_iterations):
                 print("Max iterations reached ({})".format(self.max_iterations))
                 return
+
+            # stop if the pmf is sampled 
+            if len(np.where(self.pmf < 0)) == 0:
+                print("Every window of the PMF appears to be sampled.")
+                return
             
             print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
             lambdas = dict([(self._get_lambdas_for_index(x), self._get_lambdas_for_index(y)) for x,y in new_frames.items()])
@@ -186,7 +185,7 @@ class UmbrellaRunner():
                     print("Max energy increased to {} (max={})".format(self.E, self.E_max))
                 else:
                     break
-            
+
 
     def run(self):
         # initialize the pmf
@@ -394,28 +393,64 @@ class UmbrellaRunnerTest(unittest.TestCase):
         self.assertEquals(1, len(root_frames))
         self.assertEquals((0, 2, 2), root_frames[0])
 
-    def test_get_new_frames(self):
+    def test_generate_neighbor_list(self):
+        runner = UmbrellaRunner()
+        root = (1, 3)
+        neighbors = runner._generate_neighbor_list(root)
+        expected_neighbors = [
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (2, 2),
+            (2, 3),
+            (2, 4),
+        ]
+        self.assertEquals(neighbors, expected_neighbors)
+
+    def test_generate_neighbor_list2(self):
+        runner = UmbrellaRunner()
+        root = (3, 1)
+        neighbors = runner._generate_neighbor_list(root)
+        expected_neighbors = [
+            (2, 0),
+            (2, 1),
+            (2, 2),
+            (3, 0),
+            (3, 1),
+            (3, 2),
+            (4, 0),
+            (4, 1),
+            (4, 2),
+        ]
+        self.assertEquals(neighbors, expected_neighbors)
+        pass
+
+    def test_generate_neighbor_list_3d(self):
+        runner = UmbrellaRunner()
+        root = (2, 2, 2)
+        neighbors = runner._generate_neighbor_list(root)
+        expected_neighbors = []
+        for x in [-1, 0, 1]:
+            for y in [-1, 0, 1]:
+                for z in [-1, 0, 1]:
+                    expected_neighbors.append((root[0]+x, root[1]+y, root[2]+z))
+        self.assertEquals(len(neighbors), len(expected_neighbors))
+
+
+    def test_is_in_pmf(self):
         runner = UmbrellaRunner()
         runner.cvs = np.array([
-            (-3, 3, 1),
-            (0, 4, 1)
+            (-1, 1, 1),
+            (-1, 1, 1),
+            (-1, 1, 1)
         ])
         runner.pmf = runner._init_pmf()
-        runner.pmf[0, 3] = 5
-        runner.pmf[0, 2] = 2
-        runner.pmf[0, 4] = 2
-        root_frames = [(0, 3), (0, 2), (0, 4)]
-        new_frames = runner._get_new_frames(runner.pmf, root_frames)
-
-        expected_new_frames = {
-            (0, 1): (0, 2),
-            (1, 1): (0, 2),
-            (1, 2): (0, 2),
-            (1, 3): (0, 2),
-            (1, 4): (0, 4)
-        }
-        self.assertEquals(len(expected_new_frames.keys()), len(new_frames.keys()))
-        self.assertDictEqual(expected_new_frames, new_frames)
+        self.assertFalse(runner._is_in_pmf((-1, 0, 0)))
+        self.assertFalse(runner._is_in_pmf((0, 0, 3)))
+        self.assertTrue(runner._is_in_pmf((0, 0, 0)))
 
     def test_get_new_frames_3d(self):
         runner = UmbrellaRunner()
@@ -438,6 +473,35 @@ class UmbrellaRunnerTest(unittest.TestCase):
 
         self.assertEquals(26, len(new_frames.keys()))
         self.assertDictEqual(expected_new_frames, new_frames)
+
+    def test_get_new_frames(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-2, 2, 1),
+            (-2, 2, 1),
+        ])
+        runner.pmf = np.array([
+            [-1, -1, -1, -1, -1],
+            [-1, 34, 32, 26, -1],
+            [-1, 40, 42, 51, -1],
+            [-1, 28, 41, 37, -1],
+            [-1, -1, -1, -1, -1]])
+        root_frames = [(1, 3), (3, 1)]
+        expected_new_frames = {
+            (0, 2): (1, 3),
+            (0, 3): (1, 3),
+            (0, 4): (1, 3),
+            (1, 4): (1, 3),
+            (2, 4): (1, 3),
+            (2, 0): (3, 1),
+            (3, 0): (3, 1),
+            (4, 0): (3, 1),
+            (4, 1): (3, 1),
+            (4, 2): (3, 1),
+        }
+        new_frames = runner._get_new_frames(runner.pmf, root_frames)
+        self.assertDictEqual(expected_new_frames, new_frames)
+
 
 
 if __name__ == '__main__':
