@@ -150,11 +150,11 @@ class UmbrellaRunner():
         new_frames = self._get_new_frames(self.pmf, self.sample_list, root_frames)
         
         self.num_iterations = 0
-        self.E = self.E_min
-        
+
         # outer main loop: increase E and calculate PMF until E > E_max
         while True:
-            
+            self.E = self.E_min
+
             # stop if max iterations is reached
             self.num_iterations += 1
             if(self.max_iterations > 0 and self.num_iterations > self.max_iterations):
@@ -165,14 +165,14 @@ class UmbrellaRunner():
             if len(np.where(self.pmf < 0)) == 0:
                 print("Every window of the PMF appears to be sampled.")
                 return
-            
+
             print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
             lambdas = dict([(self._get_lambdas_for_index(x), self._get_lambdas_for_index(y)) for x,y in new_frames.items()])
 
             self.pre_run_hook()
             print("Running simulations")
             self.simulate_frames(lambdas, new_frames)
-            
+
             print("Calculating new PMF")
             self.pmf = self.calculate_new_pmf()
 
@@ -180,11 +180,11 @@ class UmbrellaRunner():
             for new_frame in new_frames.keys():
                 self.sample_list[new_frame] = self.num_iterations
             self.after_run_hook()
-            
+
             while self.E <= self.E_max:
                 root_frames = self._get_root_frames(self.pmf, self.sample_list, self.E)
                 new_frames = self._get_new_frames(self.pmf, self.sample_list, root_frames)
-                
+
                 if len(new_frames) == 0:
                     self.E += self.E_incr
                     print("Max energy increased to {} (max={})".format(self.E, self.E_max))
