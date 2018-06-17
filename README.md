@@ -76,3 +76,5 @@ runner.max_iterations = 100
 runner.run()
 ```
 
+![Example](https://raw.githubusercontent.com/danijoo/adaptiveumbrella/master/examples/example.gif)
+
