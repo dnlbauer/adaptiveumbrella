@@ -4,7 +4,9 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 
-from adaptiveumbrella.runner import UmbrellaRunner
+import sys
+sys.path.append('..')
+from  adaptiveumbrella.runner import UmbrellaRunner
 
 
 class WHAM2DRunner(UmbrellaRunner):
@@ -105,18 +107,25 @@ class MyUmbrellaRunner(WHAM2DRunner):
         print("Writing new pmf to {}".format(filename))
         pmf_to_plot = deepcopy(self.pmf.T)
         pmf_to_plot[pmf_to_plot < 0] = None
-        plt.figure()
-        plt.imshow(pmf_to_plot, origin="bottom", cmap='jet')
-        ticks = [(x,x) for x in [-3, -2, -1, 0, 1, 2, 3]]
-        tick_positions = [ self._get_index_for_lambdas(x)[0] for x in ticks ]
-        tick_labels = [ str(x[0]) for x in ticks ]
-        
-        plt.xticks(tick_positions, tick_labels)
-        plt.yticks(tick_positions, tick_labels)
-        
+        frames_to_plot = deepcopy(self.sample_list.T)
+        frames_to_plot[frames_to_plot == 0] = None
 
-        cb = plt.colorbar(pad=0.1)
+        fig, (ax0, ax1) = plt.subplots(ncols=2, sharey=True)
+        im = ax0.imshow(pmf_to_plot, origin="bottom", cmap='jet')
+        cb = fig.colorbar(im, ax=ax0)
         cb.set_label("kJ/mol")
+        im2 = ax1.imshow(frames_to_plot, origin="bottom")
+        cb2 = fig.colorbar(im2, ax=ax1, ticks=np.arange(0, self.max_iterations))
+        cb.set_label("cycle")
+        # ticks = [(x,x) for x in [-3, -2, -1, 0, 1, 2, 3]]
+        # tick_positions = [ self._get_index_for_lambdas(x)[0] for x in ticks ]
+        # tick_labels = [ str(x[0]) for x in ticks ]
+
+        # ax1.set_xticks(tick_positions, tick_labels)
+        # ax1.set_yticks(tick_positions, tick_labels)
+        # ax2.set_xticks(tick_positions, tick_labels)
+        # ax2.set_yticks(tick_positions, tick_labels)
+
         plt.savefig(filename)
         os.system("cp {} {}".format(filename, "tmp/pmf_current.pdf"))
 
@@ -146,6 +155,6 @@ runner.cvs_init = (1.4, -1.4)
 runner.E_min = 10
 runner.E_max = 100
 runner.E_incr = 10
-runner.max_iterations = 30
+runner.max_iterations = 1
 
 runner.run()

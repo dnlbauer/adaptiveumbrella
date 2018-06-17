@@ -71,10 +71,12 @@ class UmbrellaRunner():
         else: # if len differs, theres no index for every dimension
             raise ValueError("{} has no index.".format(lambdas))
 
-    def _get_root_frames(self, pmf, E_max):
+    def _get_root_frames(self, pmf, frames, E_max):
         """ returns the index of all positions in the pmf where the energy is
         smaller E_max"""
-        selection = np.where((pmf <= E_max) & (pmf >= 0))
+
+        # select positions of the pmf where E <= E_max and that have already been sampled (frames > 0)
+        selection = np.where((pmf <= E_max) & (frames > 0))
         zipped = list(zip(*selection))
 
         return zipped
@@ -107,7 +109,7 @@ class UmbrellaRunner():
                 return False
         return True
 
-    def _get_new_frames(self, pmf, root_frames):
+    def _get_new_frames(self, pmf, frames, root_frames):
         """ returns a dict of all frames surrounding the root_frames
         that have not an assigned energy yet, as well as their corresponding root
         frame in the format {new_frame1: root_frame1, new_frame2: root_frame2} """
@@ -132,12 +134,11 @@ class UmbrellaRunner():
                     new_frames[n] = frame
 
 
-        # remove already sampled frames (where energy >= 0)
+        # remove already sampled frames (frames > 0)
         new_frames_list = list(new_frames.keys())
         for idx in range(len(new_frames_list)):
             new_frame = new_frames_list[idx]
-            energy = pmf[new_frame]
-            if energy >= 0:
+            if frames[new_frame] > 0:
                 del(new_frames[new_frame])
                 
         return new_frames
@@ -146,7 +147,7 @@ class UmbrellaRunner():
     def _main(self):
         # get the initial simulation and surrounding frames
         root_frames = [self._get_index_for_lambdas(self.cvs_init)]
-        new_frames = self._get_new_frames(self.pmf, root_frames)
+        new_frames = self._get_new_frames(self.pmf, self.sample_list, root_frames)
         
         self.num_iterations = 0
         self.E = self.E_min
@@ -174,11 +175,15 @@ class UmbrellaRunner():
             
             print("Calculating new PMF")
             self.pmf = self.calculate_new_pmf()
+
+            # update list of sampled windows
+            for new_frame in new_frames.keys():
+                self.sample_list[new_frame] = self.num_iterations
             self.after_run_hook()
             
             while self.E <= self.E_max:
-                root_frames = self._get_root_frames(self.pmf, self.E)
-                new_frames = self._get_new_frames(self.pmf, root_frames)
+                root_frames = self._get_root_frames(self.pmf, self.sample_list, self.E)
+                new_frames = self._get_new_frames(self.pmf, self.sample_list, root_frames)
                 
                 if len(new_frames) == 0:
                     self.E += self.E_incr
@@ -190,6 +195,9 @@ class UmbrellaRunner():
     def run(self):
         # initialize the pmf
         self.pmf = self._init_pmf()
+
+        # a list of sampled frames of the pmf (0=unsampled, 1,2,3.. = sampled )
+        self.sample_list = np.zeros(self.pmf.shape)
 
         # start the simulation/evaluation loop
         self._main()
@@ -280,9 +288,14 @@ class UmbrellaRunnerTest(unittest.TestCase):
             (0, 4, 1)
         ])
         runner.pmf = runner._init_pmf()
+        runner.sample_list = np.zeros(runner.pmf.shape)
+
         runner.pmf[0, 3] = 5
         runner.pmf[0, 2] = 2
-        root_frames = runner._get_root_frames(runner.pmf, 3)
+        runner.pmf[0, 1] = 2
+        runner.sample_list[0, 3] = 1
+        runner.sample_list[0, 2] = 1
+        root_frames = runner._get_root_frames(runner.pmf, runner.sample_list, 3)
         self.assertEquals(1, len(root_frames))
         self.assertEquals((0, 2), root_frames[0])
 
@@ -294,9 +307,13 @@ class UmbrellaRunnerTest(unittest.TestCase):
             (0, 4, 1)
         ])
         runner.pmf = runner._init_pmf()
+        runner.sample_list = np.zeros(runner.pmf.shape)
         runner.pmf[0, 3, 3] = 5
         runner.pmf[0, 2, 2] = 2
-        root_frames = runner._get_root_frames(runner.pmf, 3)
+        runner.pmf[0, 1, 2] = 2
+        runner.sample_list[0, 3, 3] = 5
+        runner.sample_list[0, 2, 2] = 2
+        root_frames = runner._get_root_frames(runner.pmf, runner.sample_list, 3)
         self.assertEquals(1, len(root_frames))
         self.assertEquals((0, 2, 2), root_frames[0])
 
@@ -359,28 +376,6 @@ class UmbrellaRunnerTest(unittest.TestCase):
         self.assertFalse(runner._is_in_pmf((0, 0, 3)))
         self.assertTrue(runner._is_in_pmf((0, 0, 0)))
 
-    def test_get_new_frames_3d(self):
-        runner = UmbrellaRunner()
-        runner.cvs = np.array([
-            (-1, 1, 1),
-            (-1, 1, 1),
-            (-1, 1, 1)
-        ])
-        runner.pmf = runner._init_pmf()
-        runner.pmf[1, 1, 1] = 5
-        root_frames = [(1, 1, 1)]
-        new_frames = runner._get_new_frames(runner.pmf, root_frames)
-
-        expected_new_frames = {}
-        for x in [0, 1, 2]:
-            for y in [0, 1, 2]:
-                for z in [0, 1, 2]:
-                    if (x, y, z) != (1, 1, 1):
-                        expected_new_frames[(x, y, z)] = (1, 1, 1)
-
-        self.assertEquals(26, len(new_frames.keys()))
-        self.assertDictEqual(expected_new_frames, new_frames)
-
     def test_get_new_frames(self):
         runner = UmbrellaRunner()
         runner.cvs = np.array([
@@ -393,6 +388,9 @@ class UmbrellaRunnerTest(unittest.TestCase):
             [-1, 40, 42, 51, -1],
             [-1, 28, 41, 37, -1],
             [-1, -1, -1, -1, -1]])
+        runner.sample_list = np.zeros(runner.pmf.shape)
+        runner.sample_list[runner.pmf > 0] = 1
+        runner.sample_list[runner.pmf < 0] = 0
         root_frames = [(1, 3), (3, 1)]
         expected_new_frames = {
             (0, 2): (1, 3),
@@ -406,9 +404,36 @@ class UmbrellaRunnerTest(unittest.TestCase):
             (4, 1): (3, 1),
             (4, 2): (3, 1),
         }
-        new_frames = runner._get_new_frames(runner.pmf, root_frames)
+        new_frames = runner._get_new_frames(runner.pmf, runner.sample_list, root_frames)
         self.assertDictEqual(expected_new_frames, new_frames)
 
+    def test_get_new_frames_differing_pmf(self):
+        runner = UmbrellaRunner()
+        runner.cvs = np.array([
+            (-2, 2, 1),
+            (-2, 2, 1),
+        ])
+        runner.pmf = np.array([
+            [-1, -1, -1, -1, -1],
+            [-1, -1, -1, -1, -1],
+            [-1, -1, 30, -1, -1],
+            [-1, -1, 20, -1, -1],
+            [-1, -1, -1, -1, -1]])
+        runner.sample_list = np.zeros(runner.pmf.shape)
+        runner.sample_list[2, 3] = 1
+        root_frames = [(2, 3)]
+        expected_new_frames = {
+            (1, 2): (2, 3),
+            (2, 2): (2, 3),
+            (3, 2): (2, 3),
+            (1, 3): (2, 3),
+            (3, 3): (2, 3),
+            (1, 4): (2, 3),
+            (2, 4): (2, 3),
+            (3, 4): (2, 3)
+        }
+        new_frames = runner._get_new_frames(runner.pmf, runner.sample_list, root_frames)
+        self.assertDictEqual(expected_new_frames, new_frames)
 
 
 if __name__ == '__main__':
