@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 from copy import deepcopy
 
@@ -110,7 +111,7 @@ class MyUmbrellaRunner(WHAM2DRunner):
     cum_frames = [0]
 
     def after_run_hook(self):
-        filename = "tmp/pmf_{}.pdf".format(self.num_iterations)
+        filename = "tmp/pmf_{}.pdf".format("%02d" % self.num_iterations)
         print("Writing new pmf to {}".format(filename))
         pmf_to_plot = deepcopy(self.pmf)
         pmf_to_plot[pmf_to_plot < 0] = None
@@ -128,13 +129,13 @@ class MyUmbrellaRunner(WHAM2DRunner):
         ax1.set_xlabel("Cycles")
         ax1.set_ylabel("Number of umbrella Windows")
 
-        ticks = [(x,x) for x in [-3, -2, -1, 0, 1, 2, 3]]
-        tick_positions = [ self._get_index_for_lambdas(x)[0] for x in ticks ]
-        tick_labels = [ str(x[0]) for x in ticks ]
-        ax0.set_yticks(tick_positions)
-        ax0.set_yticklabels(tick_labels)
-        ax0.set_xticks(tick_positions)
-        ax0.set_xticklabels(tick_labels)
+        # ticks = [(x,x) for x in [-3, -2, -1, 0, 1, 2, 3]]
+        # tick_positions = [ self._get_index_for_lambdas(x)[0] for x in ticks ]
+        # tick_labels = [ str(x[0]) for x in ticks ]
+        # ax0.set_yticks(tick_positions)
+        # ax0.set_yticklabels(tick_labels)
+        # ax0.set_xticks(tick_positions)
+        # ax0.set_xticklabels(tick_labels)
         ax0.set_ylabel("$\phi$")
         ax0.set_xlabel("$\psi$")
 
@@ -163,13 +164,13 @@ class MyUmbrellaRunner(WHAM2DRunner):
 runner = MyUmbrellaRunner()
 runner.WHAM_EXEC = "/opt/wham/wham-2d/wham-2d"
 runner.cvs = np.array([
-    (-3, 3, 0.2),
-    (-3, 3, 0.2),
+    (-3, 3, 0.3),
+    (-3, 3, 0.3),
 ])
-runner.cvs_init = (-1.4, 1.4)
-runner.E_min = 2
-runner.E_max = 50
-runner.E_incr = 5
-runner.max_iterations = 30
+runner.cvs_init = (-1.8, 1.8)
+runner.E_min = 5
+runner.E_max = 100
+runner.E_incr = 10
+runner.max_iterations = 100
 
 runner.run()

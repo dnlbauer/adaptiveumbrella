@@ -18,6 +18,6 @@ sed -i -e "s/LAMBDA2/${lambda2}/g" $FOLDER/plumed.dat
 
 cd $FOLDER
 source /usr/local/gromacs/bin/GMXRC
-gmx --quiet mdrun -deffnm topol -plumed plumed.dat -nsteps 100000 2>&1
+gmx --quiet mdrun -deffnm topol -plumed plumed.dat -nsteps 250000 2>&1
 cd ../..
 
