@@ -24,11 +24,11 @@ class WHAM2DRunner(UmbrellaRunner):
         import os
         from shutil import copyfile
 
-        simulation_dir = "simulations"
+        simulation_dir = "tmp/simulations"
         print("Collecting sampling data from simulations folder")
 
         # collect COLVARs
-        wham_dir = "WHAM/"
+        wham_dir = "tmp/WHAM/"
         if not os.path.exists(wham_dir):
             os.makedirs(wham_dir)
 
@@ -44,7 +44,7 @@ class WHAM2DRunner(UmbrellaRunner):
         with open(metadata_file, 'w') as out:
             for f in os.listdir(simulation_dir):
                 prefix, x, y = f.split("_")
-                out.write("WHAM/{}.xvg {} {} {} {}\n".format(f, x, y, fc_x, fc_y))
+                out.write("{}/{}.xvg {} {} {} {}\n".format(wham_dir, f, x, y, fc_x, fc_y))
 
         # run WHAM2d
         print("Running WHAM-2d")
@@ -101,7 +101,7 @@ class WHAM2DRunner(UmbrellaRunner):
 
 class MyUmbrellaRunner(WHAM2DRunner):
     def after_run_hook(self):
-        filename = "pmf_{}.pdf".format(self.num_iterations)
+        filename = "tmp/pmf_{}.pdf".format(self.num_iterations)
         print("Writing new pmf to {}".format(filename))
         pmf_to_plot = deepcopy(self.pmf.T)
         pmf_to_plot[pmf_to_plot < 0] = None
@@ -118,22 +118,21 @@ class MyUmbrellaRunner(WHAM2DRunner):
         cb = plt.colorbar(pad=0.1)
         cb.set_label("kJ/mol")
         plt.savefig(filename)
-        os.system("cp {} {}".format(filename, "pmf_current.pdf"))
+        os.system("cp {} {}".format(filename, "tmp/pmf_current.pdf"))
 
 
     def simulate_frames(self, lambdas, frames):
         print("{} new simulations:".format(len(lambdas)))
         counter = 0
 
+        if not os.path.exists("tmp"):
+            os.mkdir('tmp')
+
         threads = []
         for f in lambdas:
             counter += 1
-            if os.path.exists("sim/sim_{}_{}/COLVAR".format(*f)):
-                print("{}) Skipping lambdas={}/{}: COLVAR exists".format(counter, *f))
-                continue
-
             print("{}) Simulate lambda1={}, lambda2={}".format(counter, *f))
-            command = "bash sim.sh {} {} 2>&1 > run.log".format(*f)
+            command = "bash data/sim.sh {} {} 2>&1 > tmp/run.log".format(*f)
             # print("Running {}".format(command))
             os.system(command)
 
@@ -147,6 +146,6 @@ runner.cvs_init = (1.4, -1.4)
 runner.E_min = 10
 runner.E_max = 100
 runner.E_incr = 10
-runner.max_iterations = 100
+runner.max_iterations = 30
 
 runner.run()
