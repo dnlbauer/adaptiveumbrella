@@ -17,7 +17,8 @@ class UmbrellaRunner():
         E_max (float, default=inf): Final energy. Umbrella sampling is stopped if no frames with E < E_max are found
         E_incr (float, default=1): E_min is incremented by this until E_max is reached
         max_iterations (int, default=-1): Max. number of iterations before umbrella sampling stops. -1 for infinite sampling
-    
+        reset_E (boolean, default=False): Wether the energy should be reset to E_min at the start of each cycle
+        
     """
 
     def __init__(self):
@@ -25,6 +26,7 @@ class UmbrellaRunner():
         self.E_min = 0
         self.E_max = np.inf
         self.E_incr = 1
+        self.reset_E = False
 
     def _get_pmf_shape(self):
         """ returns the shape of the pmf according to the cvs """
@@ -148,14 +150,18 @@ class UmbrellaRunner():
         
         self.num_iterations = 0
 
-        self.E = self.E_min # TODO move this in the loop?
+        self.E = self.E_min
         
         # outer main loop: increase E and calculate PMF until E > E_max
         while True:
             self.num_iterations += 1
-
-            print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
+            if reset_E:
+                self.E = self.E_min
             
+            print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
+            print("Energy: {}".format(self.E))
+
+
             # find frames to sample
             if self.num_iterations == 1:
                 # get the initial simulation and surrounding frames
