@@ -15,6 +15,9 @@ For more details about the algorithm, see
 Self-Learning Adaptive Umbrella Sampling Method for the Determination of Free Energy Landscapes in Multiple Dimensions (Wojtas-Niziurski, Meng, Roux, Bernèche, 2013)
 [(https://doi.org/10.1021/ct300978b)](https://doi.org/10.1021/ct300978b)
 
+
+![Example](https://raw.githubusercontent.com/danijoo/adaptiveumbrella/master/examples/example.gif)
+
 ## Usage
 
 Implement the UmbrellaRunner class according to your needs: 
