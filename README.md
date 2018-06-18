@@ -45,7 +45,7 @@ then, we have to implement a method that updates the pmf:
 ```python
   def calculate_new_pmf(self):
   """ This is called after `simulate_frames` and should calculate the new PMF. return value must be a numpy
-  array of similar dimensions then the lambda states.
+  array of similar dimensions then the lambda states."""
   pass
 ```
 
