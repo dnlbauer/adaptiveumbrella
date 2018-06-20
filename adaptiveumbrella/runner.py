@@ -155,7 +155,7 @@ class UmbrellaRunner():
         # outer main loop: increase E and calculate PMF until E > E_max
         while True:
             self.num_iterations += 1
-            if reset_E:
+            if self.reset_E:
                 self.E = self.E_min
             
             print("~~~~~~~~~~~~~~~ Iteration {}/{} ~~~~~~~~~~~~~~~~".format(self.num_iterations, self.max_iterations))
