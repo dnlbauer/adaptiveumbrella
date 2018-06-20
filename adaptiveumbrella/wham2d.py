@@ -67,7 +67,7 @@ class WHAM2DRunner(UmbrellaRunner):
         print(cmd)
         err_code = subprocess.call(cmd, shell=True)
         if err_code != 0:
-            print("wham exited with error code {}".format(err_corde))
+            print("wham exited with error code {}".format(err_code))
             exit(1)
 
     def load_wham_pmf(self, wham_file):
