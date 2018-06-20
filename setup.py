@@ -5,7 +5,7 @@ except ImportError:
     from distutils.core import setup
 
 LONG_DESCRIPTION = """`adaptiveumbrella` is a python implementation of the
-[self-learning adaptive umbrella sampling algorithm (Wojtas-Niziurski, Meng, Roux, Bernèche, 2013)]
+[self-learning adaptive umbrella sampling algorithm (Wojtas-Niziurski, Meng, Roux, Berneche, 2013)]
 (https://pubs.acs.org/doi/abs/10.1021/ct300978b) technique. It allows the calculation of a multidimensional potential
 of mean force while automatically exploring the phase space.
 """
