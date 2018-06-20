@@ -33,6 +33,8 @@ class WHAM2DRunner(UmbrellaRunner):
         path = os.path.join(self.tmp_folder, "{}_metadata.dat".format(self.num_iterations))
         with open(path, 'w') as out:
             for file in os.listdir(self.simulation_folder):
+                if not os.path.exists(os.path.join(path, file, "COLVAR")):
+                    continue
                 prefix, x, y = file.split("_")
                 colvar_file = os.path.join(file, 'COLVAR')
                 out.write("{file}\t{x}\t{y}\t{fc_x}\t{fc_y}\n".format(
@@ -63,10 +65,9 @@ class WHAM2DRunner(UmbrellaRunner):
             outfile=output_path
         )
         print(cmd)
-        try:
-            subprocess.call(cmd, shell=True)
-        except OSError:
-            print("wham failed.")
+        err_code = subprocess.call(cmd, shell=True)
+        if err_code != 0:
+            print("wham exited with error code {}".format(err_corde))
             exit(1)
 
     def load_wham_pmf(self, wham_file):
