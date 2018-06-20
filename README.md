@@ -18,6 +18,22 @@ Self-Learning Adaptive Umbrella Sampling Method for the Determination of Free En
 
 ![Example](https://raw.githubusercontent.com/danijoo/adaptiveumbrella/master/examples/example.gif)
 
+## Installation
+
+Adaptiveumbrella supports python version 3.4+ and can be installed via pip or manually:
+
+```bash
+pip install --user git+https://github.com/danijoo/adaptiveumbrella.git
+```
+
+Alternative:
+```bash
+git clone https://github.com/danijoo/adaptiveumbrella.git
+cd adaptiveumbrella
+python setup.py install --user
+```
+
+
 ## Usage
 
 Implement the UmbrellaRunner class according to your needs: 
