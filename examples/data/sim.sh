@@ -17,7 +17,8 @@ sed -i -e "s/LAMBDA1/${lambda1}/g" $FOLDER/plumed.dat
 sed -i -e "s/LAMBDA2/${lambda2}/g" $FOLDER/plumed.dat
 
 cd $FOLDER
-source /usr/local/gromacs/bin/GMXRC
-gmx --quiet mdrun -deffnm topol -plumed plumed.dat -nsteps 250000 2>&1
+#source /usr/local/gromacs/bin/GMXRC
+source /opt/gromacs-2018/bin/GMXRC
+gmx --quiet mdrun -deffnm topol -plumed plumed.dat -nsteps 100000 2>&1
 cd ../..
 

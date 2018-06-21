@@ -98,6 +98,6 @@ runner.cvs_init = (0, 0)
 runner.E_min = 5
 runner.E_max = 100
 runner.E_incr = 10
-runner.max_iterations = 5
+runner.max_iterations = 1
 
 runner.run()

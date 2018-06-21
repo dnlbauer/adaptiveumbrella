@@ -33,7 +33,9 @@ class WHAM2DRunner(UmbrellaRunner):
         path = os.path.join(self.tmp_folder, "{}_metadata.dat".format(self.num_iterations))
         with open(path, 'w') as out:
             for file in os.listdir(self.simulation_folder):
-                if not os.path.exists(os.path.join(path, file, "COLVAR")):
+                filepath = os.path.join(self.simulation_folder, file, "COLVAR")
+                if not os.path.exists(filepath):
+                    print("Not found: {}".format(filepath))
                     continue
                 prefix, x, y = file.split("_")
                 colvar_file = os.path.join(file, 'COLVAR')
@@ -47,18 +49,38 @@ class WHAM2DRunner(UmbrellaRunner):
         """ Output file for wham-2d """
         return os.path.join(self.tmp_folder, 'freeenergy_tmp.dat')
 
+    def get_wham_borders(self):
+        """ we need to find dimensions for wham-2d calculations
+        that are as small as possible but contain all sampled frames. """
+        nonzero = np.nonzero(self.sample_list)
+        borders = np.array(
+            self._get_lambdas_for_index((nonzero[0].min(), nonzero[1].min())),
+            self._get_lambdas_for_index((nonzero[0].max(), nonzero[1].max())))
+        
+        borders = borders.flatten()
+        
+        # increase borders by 1 lambda step from minimal dimensions                        
+        borders[0] -= self.cvs[0][2]
+        borders[1] -= self.cvs[1][2]
+        borders[2] += self.cvs[0][2]
+        borders[3] += self.cvs[1][2]
+        return flat
+
+
     def run_wham2d(self, metafile_path, output_path):
         """ Runs wham-2d with the given parameters. See http://membrane.urmc.rochester.edu/sites/default/files/wham/doc.html """
 
+
+        borders = self.get_wham_borders()
         cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} 298 0 {metafile} {outfile} 0".format(
             exec=self.WHAM_EXEC,
             px=self.whamconfig['Px'],
-            min_x=self.whamconfig['hist_min_x'],
-            max_x=self.whamconfig['hist_max_x'],
+            min_x=borders[0],
+            max_x=borders[2],
             frames_x=self.whamconfig['num_bins_x'],
             py=self.whamconfig['Py'],
-            min_y=self.whamconfig['hist_min_y'],
-            max_y=self.whamconfig['hist_max_y'],
+            min_y=borders[1],
+            max_y=borders[3],
             frames_y=self.whamconfig['num_bins_y'],
             tol=self.whamconfig['tolerance'],
             metafile=metafile_path,

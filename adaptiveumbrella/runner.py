@@ -193,13 +193,14 @@ class UmbrellaRunner():
 
             print("Running simulations")
             self.simulate_frames(lambdas, new_frames)
-
-            print("Calculating new PMF")
-            self.pmf = self.calculate_new_pmf()
-
+    
             # update list of sampled windows
             for new_frame in new_frames.keys():
                 self.sample_list[new_frame] = self.num_iterations
+
+
+            print("Calculating new PMF")
+            self.pmf = self.calculate_new_pmf()
 
             self.after_run_hook()
 
