@@ -53,19 +53,18 @@ class WHAM2DRunner(UmbrellaRunner):
         """ we need to find dimensions for wham-2d calculations
         that are as small as possible but contain all sampled frames. """
         nonzero = np.nonzero(self.sample_list)
-        borders = np.array(
+        borders = np.array([
             self._get_lambdas_for_index((nonzero[0].min(), nonzero[1].min())),
-            self._get_lambdas_for_index((nonzero[0].max(), nonzero[1].max())))
+            self._get_lambdas_for_index((nonzero[0].max(), nonzero[1].max()))
+            ])
         
         borders = borders.flatten()
-        
         # increase borders by 1 lambda step from minimal dimensions                        
         borders[0] -= self.cvs[0][2]
         borders[1] -= self.cvs[1][2]
         borders[2] += self.cvs[0][2]
         borders[3] += self.cvs[1][2]
-        return flat
-
+        return borders
 
     def run_wham2d(self, metafile_path, output_path):
         """ Runs wham-2d with the given parameters. See http://membrane.urmc.rochester.edu/sites/default/files/wham/doc.html """
