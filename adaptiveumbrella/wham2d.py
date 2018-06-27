@@ -38,10 +38,12 @@ class WHAM2DRunner(UmbrellaRunner):
                     print("Not found: {}".format(filepath))
                     continue
                 prefix, x, y = file.split("_")
-                colvar_file = os.path.join(file, 'COLVAR')
-                out.write("{file}\t{x}\t{y}\t{fc_x}\t{fc_y}\n".format(
-                    file=os.path.join(self.simulation_folder, colvar_file), x=x, y=y, fc_x=self.whamconfig['fc_x'], fc_y=self.whamconfig['fc_y']
-                ))
+                index = self._get_index_for_lambdas((float(x),float(y)))
+                if self.sample_list[index] != 0:
+                    colvar_file = os.path.join(file, 'COLVAR')
+                    out.write("{file}\t{x}\t{y}\t{fc_x}\t{fc_y}\n".format(
+                        file=os.path.join(self.simulation_folder, colvar_file), x=x, y=y, fc_x=self.whamconfig['fc_x'], fc_y=self.whamconfig['fc_y']
+                    ))
         return path
 
 
