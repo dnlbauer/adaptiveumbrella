@@ -84,7 +84,7 @@ class WHAM2DRunner(UmbrellaRunner):
             max_y=borders[3],
             frames_y=self.whamconfig['num_bins_y'],
             tol=self.whamconfig['tolerance'],
-            temperature=self.whamconfig['temperature']
+            temperature=self.whamconfig['temperature'],
             metafile=metafile_path,
             outfile=output_path
         )
