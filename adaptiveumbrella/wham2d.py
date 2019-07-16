@@ -73,7 +73,7 @@ class WHAM2DRunner(UmbrellaRunner):
 
 
         borders = self.get_wham_borders()
-        cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} 298 0 {metafile} {outfile} 0".format(
+        cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} {temperature} 0 {metafile} {outfile} 0".format(
             exec=self.WHAM_EXEC,
             px=self.whamconfig['Px'],
             min_x=borders[0],
@@ -84,6 +84,7 @@ class WHAM2DRunner(UmbrellaRunner):
             max_y=borders[3],
             frames_y=self.whamconfig['num_bins_y'],
             tol=self.whamconfig['tolerance'],
+            temperature=self.whamconfig['temperature']
             metafile=metafile_path,
             outfile=output_path
         )
