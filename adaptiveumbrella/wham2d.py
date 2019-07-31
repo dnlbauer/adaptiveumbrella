@@ -21,6 +21,7 @@ class WHAM2DRunner(UmbrellaRunner):
 
     def __init__(self):
         UmbrellaRunner.__init__(self)
+        self.verbose = False
         self.WHAM_EXEC = 'wham-2d'
         self.tmp_folder = "tmp/WHAM"
         self.simulation_folder = "tmp/simulations"
@@ -34,7 +35,7 @@ class WHAM2DRunner(UmbrellaRunner):
         with open(path, 'w') as out:
             for file in os.listdir(self.simulation_folder):
                 filepath = os.path.join(self.simulation_folder, file, "COLVAR")
-                if not os.path.exists(filepath):
+                if not os.path.exists(filepath) and self.verbose:
                     print("Not found: {}".format(filepath))
                     continue
                 prefix, x, y = file.split("_")
@@ -59,9 +60,9 @@ class WHAM2DRunner(UmbrellaRunner):
             self._get_lambdas_for_index((nonzero[0].min(), nonzero[1].min())),
             self._get_lambdas_for_index((nonzero[0].max(), nonzero[1].max()))
             ])
-        
+
         borders = borders.flatten()
-        # increase borders by 1 lambda step from minimal dimensions                        
+        # increase borders by 1 lambda step from minimal dimensions
         borders[0] -= self.cvs[0][2]
         borders[1] -= self.cvs[1][2]
         borders[2] += self.cvs[0][2]
@@ -88,8 +89,12 @@ class WHAM2DRunner(UmbrellaRunner):
             metafile=metafile_path,
             outfile=output_path
         )
-        print(cmd)
-        err_code = subprocess.call(cmd, shell=True)
+        if self.verbose:
+            print(cmd)
+            err_code = subprocess.call(cmd, shell=True)
+        else:
+            FNULL = open(os.devnull, 'w')
+            err_code = subprocess.call(cmd, shell=True, stdout=FNULL)
         if err_code != 0:
             print("wham exited with error code {}".format(err_code))
             exit(1)
@@ -118,7 +123,6 @@ class WHAM2DRunner(UmbrellaRunner):
 
 
     def calculate_new_pmf(self):
-        print("Running wham-2d")
         metafile_path = self.create_metadata_file()
         wham_pmf_file = self.get_wham_output_file()
         self.run_wham2d(metafile_path, wham_pmf_file)
