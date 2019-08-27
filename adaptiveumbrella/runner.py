@@ -111,6 +111,12 @@ class UmbrellaRunner():
                 return False
         return True
 
+    def is_valid_frame(self, frame):
+        """ Allows to filter out frames that should not be sampled depending
+        on some condition """
+        # do not allow frames that are not inside pmf boundaries
+        return self._is_in_pmf(frame)
+
     def _get_new_frames(self, pmf, frames, root_frames):
         """ returns a dict of all frames surrounding the root_frames
         that have not an assigned energy yet, as well as their corresponding root
@@ -121,8 +127,8 @@ class UmbrellaRunner():
         for frame in root_frames:
             neighbors = self._generate_neighbor_list(frame)
 
-            # remove neighbors that are not inside the pmf
-            neighbors = [n for n in neighbors if self._is_in_pmf(n)]
+            # remove neighbors if they are not valid (i.e not part of the pmf)
+            neighbors = [n for n in neighbors if self.is_valid_frame(n)]
 
             # for each neighbor, check if its already in the list and compare root frame energy
             for n in neighbors:

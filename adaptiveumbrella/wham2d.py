@@ -21,6 +21,7 @@ class WHAM2DRunner(UmbrellaRunner):
 
     def __init__(self):
         UmbrellaRunner.__init__(self)
+        self.verbose = False
         self.WHAM_EXEC = 'wham-2d'
         self.tmp_folder = "tmp/WHAM"
         self.simulation_folder = "tmp/simulations"
@@ -34,7 +35,7 @@ class WHAM2DRunner(UmbrellaRunner):
         with open(path, 'w') as out:
             for file in os.listdir(self.simulation_folder):
                 filepath = os.path.join(self.simulation_folder, file, "COLVAR")
-                if not os.path.exists(filepath):
+                if not os.path.exists(filepath) and self.verbose:
                     print("Not found: {}".format(filepath))
                     continue
                 prefix, x, y = file.split("_")
@@ -59,9 +60,9 @@ class WHAM2DRunner(UmbrellaRunner):
             self._get_lambdas_for_index((nonzero[0].min(), nonzero[1].min())),
             self._get_lambdas_for_index((nonzero[0].max(), nonzero[1].max()))
             ])
-        
+
         borders = borders.flatten()
-        # increase borders by 1 lambda step from minimal dimensions                        
+        # increase borders by 1 lambda step from minimal dimensions
         borders[0] -= self.cvs[0][2]
         borders[1] -= self.cvs[1][2]
         borders[2] += self.cvs[0][2]
@@ -73,7 +74,7 @@ class WHAM2DRunner(UmbrellaRunner):
 
 
         borders = self.get_wham_borders()
-        cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} {temperature} 0 {metafile} {outfile} 0".format(
+        cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} {temperature} 0 {metafile} {outfile} {mask}".format(
             exec=self.WHAM_EXEC,
             px=self.whamconfig['Px'],
             min_x=borders[0],
@@ -84,12 +85,17 @@ class WHAM2DRunner(UmbrellaRunner):
             max_y=borders[3],
             frames_y=self.whamconfig['num_bins_y'],
             tol=self.whamconfig['tolerance'],
-            temperature=self.whamconfig['temperature']
+            temperature=self.whamconfig['temperature'],
             metafile=metafile_path,
-            outfile=output_path
+            outfile=output_path,
+            mask = self.whamconfig['mask']
         )
-        print(cmd)
-        err_code = subprocess.call(cmd, shell=True)
+        if self.verbose:
+            print(cmd)
+            err_code = subprocess.call(cmd, shell=True)
+        else:
+            FNULL = open(os.devnull, 'w')
+            err_code = subprocess.call(cmd, shell=True, stdout=FNULL)
         if err_code != 0:
             print("wham exited with error code {}".format(err_code))
             exit(1)
@@ -118,7 +124,6 @@ class WHAM2DRunner(UmbrellaRunner):
 
 
     def calculate_new_pmf(self):
-        print("Running wham-2d")
         metafile_path = self.create_metadata_file()
         wham_pmf_file = self.get_wham_output_file()
         self.run_wham2d(metafile_path, wham_pmf_file)
