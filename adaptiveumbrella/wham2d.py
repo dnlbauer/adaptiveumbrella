@@ -33,18 +33,14 @@ class WHAM2DRunner(UmbrellaRunner):
         """ create the metadata file for wham-2d """
         path = os.path.join(self.tmp_folder, "{}_metadata.dat".format(self.num_iterations))
         with open(path, 'w') as out:
-            for file in os.listdir(self.simulation_folder):
-                filepath = os.path.join(self.simulation_folder, file, "COLVAR")
-                if not os.path.exists(filepath) and self.verbose:
-                    print("Not found: {}".format(filepath))
+            for x, y in self._get_sampled_lambdas():
+                colvar_file = os.path.join(self.simulation_folder, f"umb_{x}_{y}", "COLVAR")
+                if not os.path.exists(colvar_file) and self.verbose:
+                    print("Not found: {}".format(colvar_file))
                     continue
-                prefix, x, y = file.split("_")
-                index = self._get_index_for_lambdas((float(x),float(y)))
-                if self.sample_list[index] != 0:
-                    colvar_file = os.path.join(file, 'COLVAR')
-                    out.write("{file}\t{x}\t{y}\t{fc_x}\t{fc_y}\n".format(
-                        file=os.path.join(self.simulation_folder, colvar_file), x=x, y=y, fc_x=self.whamconfig['fc_x'], fc_y=self.whamconfig['fc_y']
-                    ))
+                out.write("{file}\t{x}\t{y}\t{fc_x}\t{fc_y}\n".format(
+                    file=colvar_file, x=x, y=y, fc_x=self.whamconfig['fc_x'], fc_y=self.whamconfig['fc_y']
+                ))
         return path
 
 

@@ -47,7 +47,6 @@ class UmbrellaRunner():
         pmf = np.empty(shape)
         pmf.fill(-1)
         return pmf
-
         
     def _get_lambdas_for_index(self, idx):
         """ takes a coordinate tuple of the pmf and returns corresponding lambda values """
@@ -68,10 +67,21 @@ class UmbrellaRunner():
                 if abs(r[i]-lambdas[dimen]) < 0.00001:
                     idx.append(i)
                     break
-        if len(idx) == len(lambdas):
-            return tuple(idx)
-        else: # if len differs, theres no index for every dimension
-            raise ValueError("{} has no index.".format(lambdas))
+            if not len(idx)-1 == dimen:
+                raise ValueError(f"{lambdas} has no index because {lambdas[dimen]} is not in {r}.")
+
+        return tuple(idx)
+        
+    def _get_sampled_lambdas(self, step=None):
+        """ returns an array of all sampled lambdas. If step is given, only return
+        lambdas for this step"""
+        if step is None:
+            sampled_coords = np.where(self.sample_list > 0)
+        else:
+            sampled_coords = np.where(self.sample_list == step)
+        sampled_coords = np.array(sampled_coords).T
+        
+        return np.array([self._get_lambdas_for_index(cvs) for cvs in sampled_coords])
 
     def _get_root_frames(self, pmf, frames, E_max):
         """ returns the index of all positions in the pmf where the energy is
