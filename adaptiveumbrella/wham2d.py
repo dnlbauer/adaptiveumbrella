@@ -46,7 +46,7 @@ class WHAM2DRunner(UmbrellaRunner):
 
     def get_wham_output_file(self):
         """ Output file for wham-2d """
-        return os.path.join(self.tmp_folder, 'freeenergy_tmp.dat')
+        return os.path.join(self.tmp_folder, f'{self.num_iterations}_freeenergy.dat')
 
     def get_wham_borders(self):
         """ we need to find dimensions for wham-2d calculations
