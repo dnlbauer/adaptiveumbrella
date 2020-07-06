@@ -58,11 +58,11 @@ class WHAM2DRunner(UmbrellaRunner):
             ])
 
         borders = borders.flatten()
-        # increase borders by 1 lambda step from minimal dimensions
-        borders[0] -= self.cvs[0][2]
-        borders[1] -= self.cvs[1][2]
-        borders[2] += self.cvs[0][2]
-        borders[3] += self.cvs[1][2]
+        # increase borders by 2 lambda step from minimal dimensions
+        borders[0] -= 2*self.cvs[0][2]
+        borders[1] -= 2*self.cvs[1][2]
+        borders[2] += 2*self.cvs[0][2]
+        borders[3] += 2*self.cvs[1][2]
         return borders
 
     def run_wham2d(self, metafile_path, output_path):
