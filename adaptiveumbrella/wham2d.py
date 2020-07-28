@@ -67,7 +67,9 @@ class WHAM2DRunner(UmbrellaRunner):
 
     def run_wham2d(self, metafile_path, output_path):
         """ Runs wham-2d with the given parameters. See http://membrane.urmc.rochester.edu/sites/default/files/wham/doc.html """
-
+        if os.path.exists(output_path):
+            print(f"skipping wham, {output_path} already exists.")
+            return
 
         borders = self.get_wham_borders()
         cmd = "{exec} Px={px} {min_x} {max_x} {frames_x} Py={py} {min_y} {max_y} {frames_y} {tol} {temperature} 0 {metafile} {outfile} {mask}".format(
