@@ -101,6 +101,8 @@ class WHAM2DRunner(UmbrellaRunner):
     def load_wham_pmf(self, wham_file):
         """ Load the new pmf into a pandas dataframe """
         df = pd.read_csv(wham_file, delim_whitespace=True, names=['x', 'y', 'e', 'pro'], skiprows=1, index_col=None)
+        # if e is inf, that means this region is unsampled. we cannot really 
+        # tell its energy and set it to NaN 
         df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=['e'], how='all')
         return df
 
@@ -112,14 +114,12 @@ class WHAM2DRunner(UmbrellaRunner):
                 lambdax, lambday = self._get_lambdas_for_index((x, y))
                 reduced = wham_pmf[ (abs(wham_pmf.x-lambdax) < self.cvs[0][2]) & (abs(wham_pmf.y-lambday) < self.cvs[1][2]) ]
                 if len(reduced) == 0:
-                    continue
-
-                reduced['dist'] = reduced.apply(lambda row: np.linalg.norm((lambdax-row['x'], lambday-row['y'])), axis=1)
-                min = reduced[reduced.dist == reduced.dist.min()]
-                min_row = reduced[(reduced.x == min.x.iloc[0]) & (reduced.y == min.y.iloc[0])]
-                self.pmf[x, y] = min_row.e.iloc[0]
-
-
+                    self.pmf[x,y] = np.inf
+                else:
+                    reduced['dist'] = reduced.apply(lambda row: np.linalg.norm((lambdax-row['x'], lambday-row['y'])), axis=1)
+                    min = reduced[reduced.dist == reduced.dist.min()]
+                    min_row = reduced[(reduced.x == min.x.iloc[0]) & (reduced.y == min.y.iloc[0])]
+                    self.pmf[x, y] = min_row.e.iloc[0]
 
     def calculate_new_pmf(self):
         metafile_path = self.create_metadata_file()

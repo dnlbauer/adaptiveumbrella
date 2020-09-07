@@ -85,9 +85,7 @@ class UmbrellaRunner():
 
     def _get_root_frames(self, pmf, frames, E_max):
         """ returns the index of all positions in the pmf where the energy is
-        smaller E_max"""
-
-        # select positions of the pmf where E <= E_max and that have already been sampled (frames > 0)
+        smaller E_max and that have already been sampled"""
         selection = np.where((pmf <= E_max) & (frames > 0))
         zipped = list(zip(*selection))
 
@@ -132,32 +130,41 @@ class UmbrellaRunner():
         that have not an assigned energy yet, as well as their corresponding root
         frame in the format {new_frame1: root_frame1, new_frame2: root_frame2} """
 
-        # find all neighboring frames and create a dict that associates them to the root frame with lowest energy
+        # find all neighboring frames and create a dict 
+        # that associates them to the root frame with lowest energy
+        # new_frame -> corresponding root_frame
         new_frames = {}
-        for frame in root_frames:
-            neighbors = self._generate_neighbor_list(frame)
+        for root_frame in root_frames:
 
-            # remove neighbors if they are not valid (i.e not part of the pmf)
+            # all frames surrounding this root
+            neighbors = self._generate_neighbor_list(root_frame)
+
+            # remove invalid (i.e not part of the pmf)
             neighbors = [n for n in neighbors if self.is_valid_frame(n)]
 
-            # for each neighbor, check if its already in the list and compare root frame energy
-            for n in neighbors:
+            # for every neighbor, we try
+            # to get the root frame energy
+            # see if its already with an associated root in new_frames
+            # if yes, we swap the root frame if the new one has lower energy
+            # if not, KeyError, so the current root is our best candidate so far 
+            for neighbor in neighbors:
                 try:
-                    root_energy = pmf[frame]
-                    old_root = new_frames[n]
+                    root_energy = pmf[root_frame]
+                    old_root = new_frames[neighbor]
                     old_root_energy = pmf[old_root]
                     if root_energy < old_root_energy:
-                        new_frames[n] = frame
+                        new_frames[neighbor] = root_frame
                 except KeyError:
-                    new_frames[n] = frame
+                    new_frames[neighbor] = root_frame
 
-
-        # remove already sampled frames (frames > 0)
+        # remove already sampled frames (frames with energy > 0)
         new_frames_list = list(new_frames.keys())
         for idx in range(len(new_frames_list)):
             new_frame = new_frames_list[idx]
             if frames[new_frame] > 0:
                 del(new_frames[new_frame])
+
+        # also remove all frames where the root has no energy
                 
         return new_frames
     
